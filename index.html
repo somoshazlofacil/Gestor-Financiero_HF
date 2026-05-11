@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hazlo Fácil - Finanzas</title>
+    <!-- SDKs -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --primary: #00C805; /* Un verde vibrante y moderno */
+            --bg: var(--tg-theme-bg-color, #f4f7f6);
+            --card: var(--tg-theme-secondary-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #1a1a1a);
+            --hint: var(--tg-theme-hint-color, #707579);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            padding-bottom: 80px;
+        }
+
+        .header { margin-bottom: 20px; }
+        .brand { font-size: 24px; font-weight: 800; color: var(--primary); }
+        
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        .balance-label { font-size: 14px; color: var(--hint); }
+        .balance-amount { font-size: 32px; font-weight: bold; margin: 5px 0; }
+
+        .input-natural {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #eee;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-top: 10px;
+            outline: none;
+            transition: border 0.3s;
+        }
+
+        .input-natural:focus { border-color: var(--primary); }
+
+        .btn-main {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px;
+            width: 100%;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 15px;
+            cursor: pointer;
+        }
+
+        .grid-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .nav-bar {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: var(--card);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="brand">Hazlo Fácil</div>
+        <div id="welcome-msg">Hola, cargando...</div>
+    </div>
+
+    <!-- Dashboard Principal -->
+    <div class="card">
+        <div class="balance-label">Saldo Disponible</div>
+        <div class="balance-amount" id="main-balance">$0.00</div>
+        <canvas id="miniChart" height="100"></canvas>
+    </div>
+
+    <!-- Registro Rápido (Lenguaje Natural) -->
+    <div class="card">
+        <div style="font-weight: bold;">Registro Inteligente</div>
+        <input type="text" class="input-natural" id="natural-input" placeholder="Ej: 150 en tacos">
+        <button class="btn-main" onclick="procesarEntrada()">Registrar ahora</button>
+    </div>
+
+    <!-- Metas y Resumen -->
+    <div class="grid-stats">
+        <div class="stat-item">
+            <div class="balance-label">Ahorro</div>
+            <div style="font-weight: bold; color: var(--primary);">$1,200</div>
+        </div>
+        <div class="stat-item">
+            <div class="balance-label">Deudas</div>
+            <div style="font-weight: bold; color: #ff4d4d;">$450</div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        document.getElementById('welcome-msg').innerText = `Hola, ${tg.initDataUnsafe.user?.first_name || 'Inversionista'}`;
+
+        // Gráfico inicial de prueba
+        const ctx = document.getElementById('miniChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'],
+                datasets: [{
+                    data: [1200, 1500, 1100, 1800, 1600],
+                    borderColor: '#00C805',
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 0
+                }]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
+        });
+
+        // Función de Inteligencia para Lenguaje Natural
+        function procesarEntrada() {
+            const input = document.getElementById('natural-input').value.toLowerCase();
+            
+            // Lógica simple de extracción de datos (México focus)
+            const montoMatch = input.match(/\d+/);
+            const monto = montoMatch ? montoMatch[0] : null;
+            
+            if (monto) {
+                tg.showConfirm(`¿Confirmas el registro de $${monto}?`, (ok) => {
+                    if(ok) {
+                        tg.showScanQrPopup({ text: "Gasto registrado exitosamente en Hazlo Fácil" });
+                        setTimeout(() => tg.closeScanQrPopup(), 2000);
+                        document.getElementById('natural-input').value = "";
+                    }
+                });
+            } else {
+                tg.showAlert("No detecté un monto. Intenta: '200 en gasolina'");
+            }
+        }
+    </script>
+</body>
+</html>
