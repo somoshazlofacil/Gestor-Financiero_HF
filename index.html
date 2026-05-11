@@ -11,7 +11,7 @@
     
     <style>
         :root {
-            --primary: #00C805; /* Un verde vibrante y moderno */
+            --primary: #00C805;
             --bg: var(--tg-theme-bg-color, #f4f7f6);
             --card: var(--tg-theme-secondary-bg-color, #ffffff);
             --text: var(--tg-theme-text-color, #1a1a1a);
@@ -27,7 +27,7 @@
             padding-bottom: 80px;
         }
 
-        .header { margin-bottom: 20px; }
+        .header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
         .brand { font-size: 24px; font-weight: 800; color: var(--primary); }
         
         .card {
@@ -51,6 +51,8 @@
             margin-top: 10px;
             outline: none;
             transition: border 0.3s;
+            background: var(--card);
+            color: var(--text);
         }
 
         .input-natural:focus { border-color: var(--primary); }
@@ -80,23 +82,13 @@
             border-radius: 12px;
             text-align: center;
         }
-
-        .nav-bar {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: var(--card);
-            display: flex;
-            justify-content: space-around;
-            padding: 15px;
-            border-top: 1px solid #eee;
-        }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div class="brand">Hazlo Fácil</div>
-        <div id="welcome-msg">Hola, cargando...</div>
+        <div id="welcome-msg" style="font-size: 12px; color: var(--hint);">Cargando...</div>
     </div>
 
     <!-- Dashboard Principal -->
@@ -108,38 +100,108 @@
 
     <!-- Registro Rápido (Lenguaje Natural) -->
     <div class="card">
-        <div style="font-weight: bold;">Registro Inteligente</div>
-        <input type="text" class="input-natural" id="natural-input" placeholder="Ej: 150 en tacos">
-        <button class="btn-main" onclick="procesarEntrada()">Registrar ahora</button>
+        <div style="font-weight: bold;">Registro Inteligente 🇲🇽</div>
+        <input type="text" class="input-natural" id="natural-input" placeholder="Ej: 150 en comida">
+        <button class="btn-main" id="btn-save" onclick="procesarEntrada()">Registrar ahora</button>
     </div>
 
     <!-- Metas y Resumen -->
     <div class="grid-stats">
         <div class="stat-item">
             <div class="balance-label">Ahorro</div>
-            <div style="font-weight: bold; color: var(--primary);">$1,200</div>
+            <div id="ahorro-txt" style="font-weight: bold; color: var(--primary);">$0.00</div>
         </div>
         <div class="stat-item">
-            <div class="balance-label">Deudas</div>
-            <div style="font-weight: bold; color: #ff4d4d;">$450</div>
+            <div class="balance-label">Gasto Mes</div>
+            <div id="gasto-txt" style="font-weight: bold; color: #ff4d4d;">$0.00</div>
         </div>
     </div>
 
     <script>
+        // CONFIGURACIÓN SUPABASE
+        const PROJECT_ID = 'mvrqlnudlgfgcjxuskzg';
+        const SUPABASE_URL = `https://${PROJECT_ID}.supabase.co`;
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12cnFsbnVkbGdmZ2NqeHVza3pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0Njg5NjQsImV4cCI6MjA5NDA0NDk2NH0.aGQa_9TqLNtPL_Cgxrarl22qNgtKsO9VMIYQ9Bda7OA'; // <--- PEGA TU ANON KEY AQUÍ
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
 
-        document.getElementById('welcome-msg').innerText = `Hola, ${tg.initDataUnsafe.user?.first_name || 'Inversionista'}`;
+        const userId = tg.initDataUnsafe.user?.id || 0;
+        document.getElementById('welcome-msg').innerText = `Hola, ${tg.initDataUnsafe.user?.first_name || 'Usuario'}`;
 
-        // Gráfico inicial de prueba
+        // Cargar datos al iniciar
+        async function cargarDatos() {
+            const { data, error } = await supabase
+                .from('movimientos')
+                .select('monto, tipo')
+                .eq('user_id', userId);
+
+            if (!error && data) {
+                let saldo = 0;
+                let gastosMes = 0;
+                data.forEach(m => {
+                    if (m.tipo === 'ingreso') saldo += m.monto;
+                    if (m.tipo === 'gasto') {
+                        saldo -= m.monto;
+                        gastosMes += m.monto;
+                    }
+                });
+                document.getElementById('main-balance').innerText = `$${saldo.toFixed(2)}`;
+                document.getElementById('gasto-txt').innerText = `$${gastosMes.toFixed(2)}`;
+            }
+        }
+
+        // Función de Inteligencia para Lenguaje Natural
+        async function procesarEntrada() {
+            const input = document.getElementById('natural-input').value.toLowerCase();
+            const btn = document.getElementById('btn-save');
+            
+            // Extraer monto (números) y concepto (texto)
+            const montoMatch = input.match(/\d+/);
+            const monto = montoMatch ? parseFloat(montoMatch[0]) : null;
+            const concepto = input.replace(/\d+/g, '').replace('en', '').trim() || 'Gasto general';
+            
+            if (!monto) {
+                tg.showAlert("No encontré el monto. Intenta: '150 en comida'");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = "Guardando...";
+
+            // Guardar en Supabase
+            const { error } = await supabase
+                .from('movimientos')
+                .insert([{ 
+                    user_id: userId, 
+                    monto: monto, 
+                    descripcion: concepto, 
+                    tipo: 'gasto',
+                    categoria: 'General'
+                }]);
+
+            if (error) {
+                tg.showAlert("Error: " + error.message);
+            } else {
+                tg.showConfirm(`¡Listo! Se registró $${monto} en "${concepto}"`, (ok) => {
+                    location.reload(); 
+                });
+            }
+            
+            btn.disabled = false;
+            btn.innerText = "Registrar ahora";
+        }
+
+        // Gráfico inicial de diseño
         const ctx = document.getElementById('miniChart').getContext('2d');
         new Chart(ctx, {
             type: 'line',
             data: {
-                labels: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'],
+                labels: ['', '', '', '', ''],
                 datasets: [{
-                    data: [1200, 1500, 1100, 1800, 1600],
+                    data: [100, 150, 110, 180, 160],
                     borderColor: '#00C805',
                     tension: 0.4,
                     fill: false,
@@ -149,26 +211,7 @@
             options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
         });
 
-        // Función de Inteligencia para Lenguaje Natural
-        function procesarEntrada() {
-            const input = document.getElementById('natural-input').value.toLowerCase();
-            
-            // Lógica simple de extracción de datos (México focus)
-            const montoMatch = input.match(/\d+/);
-            const monto = montoMatch ? montoMatch[0] : null;
-            
-            if (monto) {
-                tg.showConfirm(`¿Confirmas el registro de $${monto}?`, (ok) => {
-                    if(ok) {
-                        tg.showScanQrPopup({ text: "Gasto registrado exitosamente en Hazlo Fácil" });
-                        setTimeout(() => tg.closeScanQrPopup(), 2000);
-                        document.getElementById('natural-input').value = "";
-                    }
-                });
-            } else {
-                tg.showAlert("No detecté un monto. Intenta: '200 en gasolina'");
-            }
-        }
+        cargarDatos();
     </script>
 </body>
 </html>
